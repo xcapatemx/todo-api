@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html ng-app="miapp">
+  <head>
+    <title><%= title %></title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body>
+  <h1><%= title %></h1>
+  <p>Welcome to <%= title %></p>
+
+  <!-- aqui renderiza vistas-->
+  <ng-view></ng-view>
+
+	<!-- Libraries -->
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular-route.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular-resource.min.js"></script>
+
+    <!-- Template mostrar todas las tareas-->
+	<script type="text/ng-template" id="/todos.html" ng-controller="TodoController">
+ 		Search: <input type="text" ng-model="search.name">
+  		<ul>
+   	 		<li ng-repeat="todo in todos | filter: search">
+      			<input type="checkbox" ng-model="todo.completed" ng-change="update($index)">
+      			<a ng-show="!editing[$index]" href="#/{{todo._id}}">{{todo.name}}</a>
+      			<button ng-show="!editing[$index]" ng-click="edit($index)">Editar</button>
+      			<input ng-show="editing[$index]" type="text" ng-model="todo.name">
+      			<button ng-show="editing[$index]" ng-click="update($index)">Modificar</button>
+      			<button ng-show="editing[$index]" ng-click="cancel($index)">Cancelar</button>
+				<button ng-show="!editing[$index]" ng-click="remove($index)">Borrar</button>
+				<br>
+				
+    		</li>
+    		<li>
+    			<label>Nueva Tarea</label>
+				<input type="text" ng-model="newTodo">
+				<button ng-click="save()" >Crear</button>
+			</li>
+  		</ul>
+	</script>
+	<!--template para ver detalle de tarea-->
+	<script type="text/ng-template" id="/todoDetails.html">
+  		<h1>{{ todo.name }}</h1>
+  			<label>Copletado:</label>
+  			<input type="checkbox" ng-model="todo.completed"><br>
+  			<label>Notas</label>
+  			<textarea ng-model="todo.note"></textarea><br><br>
+  			<button ng-click="update()">Actualizar</button>
+  			<a href="/">Cancel</a>
+			<button ng-click="remove()">Eliminar</button>
+	</script>
+
+	<!--modulo y controladores-->
+	<script>
+		//declaramos que la app se llama app
+  		angular.module('miapp', ['ngRoute',"ngResource"])
+	    //---------------
+    	// factory resource permite interactuar con restful api crud ops
+    	// resource(url:(parametroopcional),parametros default,acciones {nombreaccion:{method:"metodo"}})
+    	//---------------
+    	.factory('Todos',["$resource",function($resource){
+    		return $resource("/todos/:id",null,{"update":{method:"PUT"}});
+    	}])
+
+	    //---------------
+   	 	// Controllers
+    	//---------------
+    	// controlador que va a ejecutar el factory y recibir los datps
+    	// nombreCotrolador, scope va a devolver el html, Todos el modelo de factory y callback function que va a escribit en el template
+    	.controller('TodoController', ['$scope', 'Todos','$location', function ($scope, Todos, $location) {
+  			$scope.editing = [];
+  			$scope.todos = Todos.query();
+
+  			//function save para guardar nueva tarea -->
+  			$scope.save = function(){
+    			if(!$scope.newTodo || $scope.newTodo.length < 1){
+    				console.log("Esta vacia la madre esa!: " + $scope.newTodo);
+    				return;
+    			}else{
+    				console.log("Creando tarea");
+					var todo = new Todos({ name: $scope.newTodo, completed: false });
+    				todo.$save(function(){
+		      			$scope.todos.push(todo);
+      					$scope.newTodo = ''; // clear textbox
+    				});
+    			} 
+    			
+  			}
+
+  			//funcion para actualizar una tarea -->
+  			$scope.update = function(index){
+	    		var todo = $scope.todos[index];
+    			Todos.update({id: todo._id}, todo);
+    			$scope.editing[index] = false;
+  			}
+
+	  		//funcion para editar una tarea -->
+  			$scope.edit = function(index){ //recibe indice de objeto en factory
+	    		$scope.editing[index] = angular.copy($scope.todos[index]); //clona el item
+  			}
+
+  			//funcion que cancela edicion -->
+  			$scope.cancel = function(index){ //recibe indice de fabrica
+			    $scope.todos[index] = angular.copy($scope.editing[index]); //drestablece el item clonado
+    			$scope.editing[index] = false;
+  			}
+
+  			//funcion para borrar un item
+  			$scope.remove = function(index){
+	  			var todo = $scope.todos[index];
+  				Todos.remove({id: todo._id}, function(){
+    				$scope.todos.splice(index, 1); //elimina del template el item
+  				});
+			}
+		}])
+    
+
+		.controller('TodoDetailCtrl', ['$scope', '$routeParams', 'Todos', '$location', function ($scope, $routeParams, Todos, $location) {
+	  		$scope.todo = Todos.get({id: $routeParams.id });
+
+	  		//function para actualizar item -->
+  			$scope.update = function(){
+		    	Todos.update({id: $scope.todo._id}, $scope.todo, function(){
+    	  			$location.url('/');
+    			});
+  			}
+  			//funcion para eliminar la tarea -->
+  			$scope.remove = function(){
+		  		Todos.remove({id: $scope.todo._id}, function(){
+    				$location.url('/');
+  				});
+			}
+		}])
+
+		//---------------
+		// Rutas
+		//---------------
+	    .config(['$routeProvider', function ($routeProvider) {
+			$routeProvider
+    	    .when('/', {
+       	   		templateUrl: '/todos.html',
+          		controller: 'TodoController'
+        	})
+
+        	.when('/:id', {
+          		templateUrl: '/todoDetails.html',
+          		controller: 'TodoDetailCtrl'
+       		});
+    	}]);
+	</script>
+</body>
+</html>
